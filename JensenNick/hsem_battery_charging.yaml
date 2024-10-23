@@ -166,8 +166,8 @@ template:
           {{ (total.sum * -1) | round(3) }}
       ## ------------------------------------------
       ## Reserve Battery Capacity for Solar Surplus
-      - name: "Huawei Solar Energy Management Reserve Solar Surplus Tomorrow"
-        unique_id: huawei_solar_energy_management_reserve_solar_surplus_tomorrow
+      - name: "Huawei Solar Energy Management Solar Surplus Today Percent"
+        unique_id: huawei_solar_energy_management_solar_surplus_today_percent
         unit_of_measurement: %
         state_class: measurement
         state: >
@@ -175,8 +175,8 @@ template:
           states('sensor.batteries_rated_capacity') | float * 100 }}
         availability:
           {{ has_value('sensor.batteries_rated_capacity') }}
-      - name: "Huawei Solar Energy Management AC Max Solar Surplus"
-        unique_id: huawei_solar_energy_management_ac_max_solar_surplus
+      - name: "Huawei Solar Energy Management Solar Surplus Today AC CutOFF"
+        unique_id: huawei_solar_energy_management_solar_surplus_today_ac_cutoff
         unit_of_measurement: %
         state_class: measurement
         state: >
