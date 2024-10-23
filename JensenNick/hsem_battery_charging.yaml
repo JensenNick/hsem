@@ -54,7 +54,7 @@ template:
           {% set delta_soc = states('number.batteries_grid_charge_cutoff_soc') | float(0) - 
           states('sensor.batteries_state_of_capacity') | float(0) %}
             {{ ( rated_capacity * delta_soc ) | float(0) / 100 }}
-      - name: "Huawei Solar Energy Management Charge Capacity Solar"
+      - name: "Huawei Solar Energy Management Charge Capacity Solar PV"
         unique_id: huawei_solar_energy_management_charge_capacity_solar_pv
         unit_of_measurement: "kWh"
         state_class: measurement
