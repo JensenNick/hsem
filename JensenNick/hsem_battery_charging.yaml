@@ -164,8 +164,8 @@ template:
               {% endif %}
           {% endfor %}
           {{ (total.sum * -1) | round(3) }}
-      ## ------------------------------------------
-      ## Reserve Battery Capacity for Solar Surplus
+      ## ---------------------------------------------------------------
+      ## AC Charge CutOFF and Reserve Battery Capacity for Solar Surplus
       - name: "Huawei Solar Energy Management Solar Surplus Today Percent"
         unique_id: huawei_solar_energy_management_solar_surplus_today_percent
         unit_of_measurement: %
