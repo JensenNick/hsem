@@ -164,6 +164,28 @@ template:
               {% endif %}
           {% endfor %}
           {{ (total.sum * -1) | round(3) }}
+      ## ------------------------------------------
+      ## Reserve Battery Capacity for Solar Surplus
+      - name: "Huawei Solar Energy Management Reserve Solar Surplus Tomorrow"
+        unique_id: huawei_solar_energy_management_reserve_solar_surplus_tomorrow
+        unit_of_measurement: %
+        state_class: measurement
+        state: >
+          {{ states('sensor.huawei_solar_energy_management_solar_surplus_today') | float(0) /
+          states('sensor.batteries_rated_capacity') | float * 100 }}
+        availability:
+          {{ has_value('sensor.batteries_rated_capacity') }}
+      - name: "Huawei Solar Energy Management AC Max Solar Surplus"
+        unique_id: huawei_solar_energy_management_ac_max_solar_surplus
+        unit_of_measurement: %
+        state_class: measurement
+        state: >
+          {% set end_of_charge_soc = states('sensor.number.batteries_end_of_charge_soc') | float(0) %}
+          {% set reserve_solar_surplus = states('huawei_solar_energy_management_reserve_solar_surplus_tomorrow') | float(0) %}
+          {% if ( end_of_charge_soc - reserve_solar_surplus ) | float(0) | round(0) > 20 %}
+            {{ ( end_of_charge_soc - reserve_solar_surplus ) float(0) | round(0) }}
+          {% else %}
+            {{ no_ac_charge }}
       ## --------------------------
       ## Forecast Correction Factor
       - name: "Huawei Solar Energy Management Forecast Correction Factor"
