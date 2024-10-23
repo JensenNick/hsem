@@ -171,8 +171,8 @@ template:
         state: >
           {{ (
           states('sensor.solcast_pv_forecast_forecast_remaining_today') | float(0) +
-          states('huawei_solar_energy_management_energy_yield_1') | float(0) +
-          states('huawei_solar_energy_management_energy_yield_2') | float(0)
+          states('huawei_solar_energy_management_daily_yield_1_energy') | float(0) +
+          states('huawei_solar_energy_management_daily_yield_2_energy') | float(0)
           ) /
           states('sensor.solcast_pv_forecast_forecast_today') | float(0) }}
 # ------------------------
