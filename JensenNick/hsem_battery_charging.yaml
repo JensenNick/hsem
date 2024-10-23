@@ -182,7 +182,7 @@ template:
         state: >
           {% set end_of_charge_soc = states('sensor.number.batteries_end_of_charge_soc') | float(0) %}
           {% set reserve_solar_surplus = states('huawei_solar_energy_management_reserve_solar_surplus_tomorrow') | float(0) %}
-          {% if ( end_of_charge_soc - reserve_solar_surplus ) | float(0) | round(0) > 20 %}
+          {% if ( end_of_charge_soc - reserve_solar_surplus ) | float(0) | round(0) >= 20 %}
             {{ ( end_of_charge_soc - reserve_solar_surplus ) float(0) | round(0) }}
           {% else %}
             {{ no_ac_charge }}
