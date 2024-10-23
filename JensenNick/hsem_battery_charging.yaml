@@ -165,7 +165,7 @@ template:
           {% endfor %}
           {{ (total.sum * -1) | round(3) }}
       ## --------------------------
-      ## Forecast correction Factor
+      ## Forecast Correction Factor
       - name: "Huawei Solar Energy Management Forecast Correction Factor"
         unique_id: huawei_solar_energy_management_forecast_correction_factor
         state: >
