@@ -175,13 +175,33 @@ template:
           states('sensor.batteries_rated_capacity') | float * 100 }}
         availability:
           {{ has_value('sensor.batteries_rated_capacity') }}
+      - name: "Huawei Solar Energy Management Solar Surplus Tomorrow Percent"
+        unique_id: huawei_solar_energy_management_solar_surplus_tomorrow_percent
+        unit_of_measurement: %
+        state_class: measurement
+        state: >
+          {{ states('sensor.huawei_solar_energy_management_solar_surplus_tomorrow') | float(0) /
+          states('sensor.batteries_rated_capacity') | float * 100 }}
+        availability:
+          {{ has_value('sensor.batteries_rated_capacity') }}
       - name: "Huawei Solar Energy Management Solar Surplus Today AC CutOFF"
         unique_id: huawei_solar_energy_management_solar_surplus_today_ac_cutoff
         unit_of_measurement: %
         state_class: measurement
         state: >
           {% set end_of_charge_soc = states('sensor.number.batteries_end_of_charge_soc') | float(0) %}
-          {% set reserve_solar_surplus = states('huawei_solar_energy_management_reserve_solar_surplus_tomorrow') | float(0) %}
+          {% set reserve_solar_surplus = states('huawei_solar_energy_management_solar_surplus_today_percent') | float(0) %}
+          {% if ( end_of_charge_soc - reserve_solar_surplus ) | float(0) | round(0) >= 20 %}
+            {{ ( end_of_charge_soc - reserve_solar_surplus ) float(0) | round(0) }}
+          {% else %}
+            {{ no_ac_charge }}
+      - name: "Huawei Solar Energy Management Solar Surplus Tomorrow AC CutOFF"
+        unique_id: huawei_solar_energy_management_solar_surplus_tomorrow_ac_cutoff
+        unit_of_measurement: %
+        state_class: measurement
+        state: >
+          {% set end_of_charge_soc = states('sensor.number.batteries_end_of_charge_soc') | float(0) %}
+          {% set reserve_solar_surplus = states('huawei_solar_energy_management_solar_surplus_tomorrow_percent') | float(0) %}
           {% if ( end_of_charge_soc - reserve_solar_surplus ) | float(0) | round(0) >= 20 %}
             {{ ( end_of_charge_soc - reserve_solar_surplus ) float(0) | round(0) }}
           {% else %}
