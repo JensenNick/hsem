@@ -1,0 +1,413 @@
+# Input sensors from the Huawei Solar integration v1.5.0a1 (beta)
+# - sensor.batteries_state_of_capacity
+# - number.batteries_grid_charge_cutoff_soc
+# - number.batteries_end_of_charge_soc
+# - sensor.batteries_rated_capacity
+# - number.batteries_maximum_charging_power
+#
+# Input Sensors from the PEES package.
+# - sensor.power_inverter_1_input
+# - sensor.power_inverter_2_input
+#
+# ----------
+# INPUT TEXT
+# ----------
+input_text:
+  huawei_solar_energy_management_manually_set_charging_power:
+    name: "Huawei Solar Energy Management Manually Set Charging Power"
+    pattern: "[0-9]*"
+    max: 4
+    min: 4
+# ----------------
+# PLATFORM SENSORS
+# ----------------
+sensor:
+  # Energy Calculation based on Power Input Sensor (maybe you have it elsewhere) 
+  - platform: integration
+    source: sensor.power_inverter_1_input
+    name: "Huawei Solar Energy Management Energy Yield #1"
+    unique_id: huawei_solar_energy_management_energy_yield_1
+    round: 6
+    unit_prefix: k
+    unit_time: h
+    method: left
+  - platform: integration
+    source: sensor.power_inverter_2_input
+    name: "Huawei Solar Energy Management Energy Yield #2"
+    unique_id: huawei_solar_energy_management_energy_yield_2
+    round: 6
+    unit_prefix: k
+    unit_time: h 
+# ----------------
+# TEMPLATE SENSORS
+# ----------------
+template:
+  - sensor:
+      ## -----------------------------------------
+      ## Charge Capacity in kWh for Grid and Solar
+      - name: "Huawei Solar Energy Management Charge Capacity Grid"
+        unique_id: huawei_solar_energy_management_charge_capacity_grid
+        unit_of_measurement: "kWh"
+        state_class: measurement
+        state: >
+          {% set rated_capacity = states('sensor.batteries_rated_capacity') | float(0) / 1000 %}
+          {% set delta_soc = states('number.batteries_grid_charge_cutoff_soc') | float(0) - 
+          states('sensor.batteries_state_of_capacity') | float(0) %}
+            {{ ( rated_capacity * delta_soc ) | float(0) / 100 }}
+      - name: "Huawei Solar Energy Management Charge Capacity Solar"
+        unique_id: huawei_solar_energy_management_charge_capacity_solar_pv
+        unit_of_measurement: "kWh"
+        state_class: measurement
+        state: >
+          {% set rated_capacity = states('sensor.batteries_rated_capacity') | float(0) / 1000 %}
+          {% set delta_soc = states('number.batteries_end_of_charge_soc') | float(0) - 
+          states('sensor.batteries_state_of_capacity') | float(0) %}
+            {{ ( rated_capacity * delta_soc ) | float(0) / 100 }}
+      ## -----------------------
+      ## Estimated Charging Time
+      - name: "Huawei Solar Energy Management Estimated Charging Time Grid Charge"
+        unique_id: huawei_solar_energy_management_estimated_charging_time_grid_charge
+        unit_of_measurement: seconds
+        state: >
+          {% if is_state('input_text_huawei_solar_energy_management_manually_set_charging_power','') or
+          is_state('input_text_huawei_solar_energy_management_manually_set_charging_power','unavailable') or
+          is_state('input_text_huawei_solar_energy_management_manually_set_charging_power','unknown') %}
+            {{ states('sensor.huawei_solar_energy_management_charge_capacity_grid') | float(0) /
+            states('number.batteries_maximum_charging_power') | float }}
+          {% else %}
+            {{ states('sensor.huawei_solar_energy_management_charge_capacity_grid') | float(0) /
+            states('input_text_huawei_solar_energy_management_manually_set_charging_power') | float }}        
+          {% endif %}
+      ## ---------------------------------------------------------
+      ## Energy Forcast Surplus and Deficit for Today and Tomorrow
+      - name: "Huawei Solar Energy Management Solar Surplus Today"
+        unique_id: huawei_solar_energy_management_solar_surplus_today
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: >
+          {% set total = namespace(sum=0) %}
+          {% set today_attributes = [
+              'today_00_01', 'today_01_02', 'today_02_03', 'today_03_04',
+              'today_04_05', 'today_05_06', 'today_06_07', 'today_07_08',
+              'today_08_09', 'today_09_10', 'today_10_11', 'today_11_12',
+              'today_12_13', 'today_13_14', 'today_14_15', 'today_15_16',
+              'today_16_17', 'today_17_18', 'today_18_19', 'today_19_20',
+              'today_20_21', 'today_21_22', 'today_22_23', 'today_23_00'
+          ] %}
+          {% for attr in today_attributes %}
+              {% set value = state_attr('sensor.huawei_solar_energy_management_energy_forecast', attr) | float(0) %}
+              {% if value > 0 %}
+                  {% set total.sum = total.sum + value %}
+              {% endif %}
+          {% endfor %}
+          {{ total.sum | round(3) }}
+      - name: "Huawei Solar Energy Management Solar Surplus Tomorrow"
+        unique_id: huawei_solar_energy_management_solar_surplus_tomorrow
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: >
+          {% set total = namespace(sum=0) %}
+          {% set tomorrow_attributes = [
+              'tomorrow_00_01', 'tomorrow_01_02', 'tomorrow_02_03', 'tomorrow_03_04',
+              'tomorrow_04_05', 'tomorrow_05_06', 'tomorrow_06_07', 'tomorrow_07_08',
+              'tomorrow_08_09', 'tomorrow_09_10', 'tomorrow_10_11', 'tomorrow_11_12',
+              'tomorrow_12_13', 'tomorrow_13_14', 'tomorrow_14_15', 'tomorrow_15_16',
+              'tomorrow_16_17', 'tomorrow_17_18', 'tomorrow_18_19', 'tomorrow_19_20',
+              'tomorrow_20_21', 'tomorrow_21_22', 'tomorrow_22_23', 'tomorrow_23_00'
+          ] %}
+          {% for attr in tomorrow_attributes %}
+              {% set value = state_attr('sensor.huawei_solar_energy_management_energy_forecast', attr) | float(0) %}
+              {% if value > 0 %}
+                  {% set total.sum = total.sum + value %}
+              {% endif %}
+          {% endfor %}
+          {{ total.sum | round(3) }}
+      - name: "Huawei Solar Energy Management Energy Deficit Today"
+        unique_id: huawei_solar_energy_management_energy_deficit_today
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: >
+          {% set total = namespace(sum=0) %}
+          {% set today_attributes = [
+              'today_00_01', 'today_01_02', 'today_02_03', 'today_03_04',
+              'today_04_05', 'today_05_06', 'today_06_07', 'today_07_08',
+              'today_08_09', 'today_09_10', 'today_10_11', 'today_11_12',
+              'today_12_13', 'today_13_14', 'today_14_15', 'today_15_16',
+              'today_16_17', 'today_17_18', 'today_18_19', 'today_19_20',
+              'today_20_21', 'today_21_22', 'today_22_23', 'today_23_00'
+          ] %}
+          {% for attr in today_attributes %}
+              {% set value = state_attr('sensor.huawei_solar_energy_management_energy_forecast', attr) | float(0) %}
+              {% if value < 0 %}
+                  {% set total.sum = total.sum + value %}
+              {% endif %}
+          {% endfor %}
+          {{ (total.sum * -1) | round(3) }}
+      - name: "Huawei Solar Energy Management Energy Deficit Tomorrow"
+        unique_id: huawei_solar_energy_management_energy_deficit_tomorrow
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: >
+          {% set total = namespace(sum=0) %}
+          {% set tomorrow_attributes = [
+              'tomorrow_00_01', 'tomorrow_01_02', 'tomorrow_02_03', 'tomorrow_03_04',
+              'tomorrow_04_05', 'tomorrow_05_06', 'tomorrow_06_07', 'tomorrow_07_08',
+              'tomorrow_08_09', 'tomorrow_09_10', 'tomorrow_10_11', 'tomorrow_11_12',
+              'tomorrow_12_13', 'tomorrow_13_14', 'tomorrow_14_15', 'tomorrow_15_16',
+              'tomorrow_16_17', 'tomorrow_17_18', 'tomorrow_18_19', 'tomorrow_19_20',
+              'tomorrow_20_21', 'tomorrow_21_22', 'tomorrow_22_23', 'tomorrow_23_00'
+          ] %}
+          {% for attr in tomorrow_attributes %}
+              {% set value = state_attr('sensor.huawei_solar_energy_management_energy_forecast', attr) | float(0) %}
+              {% if value < 0 %}
+                  {% set total.sum = total.sum + value %}
+              {% endif %}
+          {% endfor %}
+          {{ (total.sum * -1) | round(3) }}
+      ## --------------------------
+      ## Forecast correction Factor
+      - name: "Huawei Solar Energy Management Forecast Correction Factor"
+        unique_id: huawei_solar_energy_management_forecast_correction_factor
+        state: >
+          {{ (
+          states('sensor.solcast_pv_forecast_forecast_remaining_today') | float(0) +
+          states('huawei_solar_energy_management_energy_yield_1') | float(0) +
+          states('huawei_solar_energy_management_energy_yield_2') | float(0)
+          ) /
+          states('sensor.solcast_pv_forecast_forecast_today') | float(0) }}
+# ------------------------
+# TEMPLATE TRIGGER SENSORS
+# ------------------------
+  ## -------------------------------------
+  ## Energy Forcast for Today and Tomorrow
+  - trigger:
+    - trigger: state
+      entity_id:
+      - sensor.huawei_solar_energy_management_daily_yield_1_energy
+      - sensor.huawei_solar_energy_management_daily_yield_2_energy
+      - sensor.solcast_pv_forecast_forecast_remaining_today
+      - sensor.solcast_pv_forecast_forecast_today
+    variables:
+      forecast_correction_factor: >
+        {{ states('input_number.huawei_solar_energy_management_energy_forecast_correction_factor') | float(0) }}
+    sensor:
+      - name: "Huawei Solar Energy Management Energy Forecast"
+        unique_id: huawei_solar_energy_management_energy_forecast
+        unit_of_measurement: kWh
+        state_class: measurement
+        state: >
+          {{ (
+          states('sensor.huawei_solar_energy_management_daily_yield_1_energy') | float(0) +
+          states('sensor.huawei_solar_energy_management_daily_yield_2_energy') | float(0) +
+          states('sensor.solcast_pv_forecast_forecast_remaining_today') | float(0) -
+          states('sensor.solcast_pv_forecast_forecast_today') | float(0) 
+          ) | round(3) }}
+        attributes:
+          today_00_01: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [0] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_00_01_energy)) | float(0) | round(3) }}
+          today_01_02: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [1] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_01_02_energy)) | float(0) | round(3) }}
+          today_02_03: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [2] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_02_03_energy)) | float(0) | round(3) }}
+          today_03_04: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [3] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_03_04_energy)) | float(0) | round(3) }}
+          today_04_05: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [4] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_04_05_energy)) | float(0) | round(3) }}
+          today_05_06: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [5] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_05_06_energy)) | float(0) | round(3) }}
+          today_06_07: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [6] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_06_07_energy)) | float(0) | round(3) }}
+          today_07_08: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [7] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_07_08_energy)) | float(0) | round(3) }}
+          today_08_09: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [8] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_08_09_energy)) | float(0) | round(3) }}
+          today_09_10: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [9] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_09_10_energy)) | float(0) | round(3) }}
+          today_10_11: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [10] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_10_11_energy)) | float(0) | round(3) }}
+          today_11_12: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [11] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_11_12_energy)) | float(0) | round(3) }}
+          today_12_13: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [12] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_12_13_energy)) | float(0) | round(3) }}
+          today_13_14: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [13] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_13_14_energy)) | float(0) | round(3) }}
+          today_14_15: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [14] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_14_15_energy)) | float(0) | round(3) }}
+          today_15_16: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [15] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_15_16_energy)) | float(0) | round(3) }}
+          today_16_17: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [16] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_16_17_energy)) | float(0) | round(3) }}
+          today_17_18: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [17] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_17_18_energy)) | float(0) | round(3) }}
+          today_18_19: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [18] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_18_19_energy)) | float(0) | round(3) }}
+          today_19_20: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [19] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_19_20_energy)) | float(0) | round(3) }}
+          today_20_21: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [20] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_20_21_energy)) | float(0) | round(3) }}
+          today_21_22: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [21] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_21_22_energy)) | float(0) | round(3) }}
+          today_22_23: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [22] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_22_23_energy)) | float(0) | round(3) }}
+          today_23_00: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_today', 'detailedHourly') [23] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_23_00_energy)) | float(0) | round(3) }}
+          tomorrow_00_01: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [0] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_00_01_energy)) | float(0) | round(3) }}
+          tomorrow_01_02: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [1] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_01_02_energy)) | float(0) | round(3) }}
+          tomorrow_02_03: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [2] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_02_03_energy)) | float(0) | round(3) }}
+          tomorrow_03_04: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [3] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_03_04_energy)) | float(0) | round(3) }}
+          tomorrow_04_05: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [4] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_04_05_energy)) | float(0) | round(3) }}
+          tomorrow_05_06: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [5] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_05_06_energy)) | float(0) | round(3) }}
+          tomorrow_06_07: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [6] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_06_07_energy)) | float(0) | round(3) }}
+          tomorrow_07_08: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [7] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_07_08_energy)) | float(0) | round(3) }}
+          tomorrow_08_09: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [8] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_08_09_energy)) | float(0) | round(3) }}
+          tomorrow_09_10: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [9] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_09_10_energy)) | float(0) | round(3) }}
+          tomorrow_10_11: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [10] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_10_11_energy)) | float(0) | round(3) }}
+          tomorrow_11_12: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [11] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_11_12_energy)) | float(0) | round(3) }}
+          tomorrow_12_13: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [12] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_12_13_energy)) | float(0) | round(3) }}
+          tomorrow_13_14: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [13] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_13_14_energy)) | float(0) | round(3) }}
+          tomorrow_14_15: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [14] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_14_15_energy)) | float(0) | round(3) }}
+          tomorrow_15_16: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [15] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_15_16_energy)) | float(0) | round(3) }}
+          tomorrow_16_17: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [16] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_16_17_energy)) | float(0) | round(3) }}
+          tomorrow_17_18: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [17] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_17_18_energy)) | float(0) | round(3) }}
+          tomorrow_18_19: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [18] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_18_19_energy)) | float(0) | round(3) }}
+          tomorrow_19_20: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [19] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_19_20_energy)) | float(0) | round(3) }}
+          tomorrow_20_21: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [20] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_20_21_energy)) | float(0) | round(3) }}
+          tomorrow_21_22: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [21] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_21_22_energy)) | float(0) | round(3) }}
+          tomorrow_22_23: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [22] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_22_23_energy)) | float(0) | round(3) }}
+          tomorrow_23_00: >
+            {{ (
+            state_attr('sensor.solcast_pv_forecast_forecast_tomorrow', 'detailedHourly') [23] ['pv_estimate'] | float(0) -
+            forecast_correction_factor * (sensor.huawei_solar_energy_management_house_consumption_23_00_energy)) | float(0) | round(3) }}
+# --------------
+# UTILITY METERS
+# --------------
+utility_meter:
+  # -------------
+  # Energy Meters
+  daily_yield_1_energy:
+    source: sensor.huawei_solar_energy_management_energy_yield_1
+    name: "Huawei Solar Energy Management Daily Yield 1 - Energy"
+    unique_id: huawei_solar_energy_management_daily_yield_1_energy
+    cycle: daily
+  daily_yield_2_energy:
+    source: sensor.huawei_solar_energy_management_energy_yield_2
+    name: "Huawei Solar Energy Management Daily Yield 2 - Energy"
+    unique_id: huawei_solar_energy_management_daily_yield_2_energy
+    cycle: daily
